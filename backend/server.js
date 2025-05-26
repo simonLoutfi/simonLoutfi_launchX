@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv'); 
-const { OpenAI } = require('openai/index.mjs');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 dotenv.config(); 
 
@@ -11,31 +11,29 @@ const PORT = process.env.PORT;
 app.use(cors());
 app.use(express.json());
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 app.post('/generate', async (req, res) => {
-  const { prompt, tone } = req.body;
+  const { prompt } = req.body;
 
-  const message = [
-    { role: "system", content: `You are a startup mentor who provides reflection about start up ideas.` },
-    { role: "user", content: `Provide a verdict about ${prompt}. Return either Promising or Needs Work. Start with the title 'Verdict:'.` },
-    { role: "user", content: `Provide a brief explanation about why ${prompt} is  Promising or Needs Work. Start the paragraph with the title 'Brief Explanation:'.` },
-    { role: "user", content: `Provide one paragraph of improvement suggestion about ${prompt}. Start the paragraph with the title 'Improvement Suggestion:'.` },
-  ];
+  const message = `
+    You are a startup mentor who provides reflection about startup ideas.
+    Provide a verdict about "${prompt}". Return either "Promising" or "Needs Work". Start with the title "Verdict:".
+    Provide a brief explanation about why "${prompt}" is Promising or Needs Work. Start the paragraph with the title "Brief Explanation:".
+    Provide one paragraph of improvement suggestion about "${prompt}". Start the paragraph with the title "Improvement Suggestion:".
+    `;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: message
-    });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const responseMessage = completion?.choices?.[0]?.message?.content || "No response";
-    res.json({ message: responseMessage });
+    const result = await model.generateContent(message);
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({ message: text });
 
   } catch (error) {
-    console.error("OpenAI API error:", error.message || error);
+    console.error("Gemini API error:", error.message || error);
     res.status(500).json({ message: "No response" });
   }
 });
